@@ -1,0 +1,2428 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D Chess</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        overflow: hidden;
+        background: #1a1a2e;
+        font-family: "Segoe UI", sans-serif;
+      }
+      canvas {
+        display: block;
+      }
+      #overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 10;
+      }
+      #topBar {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 16px;
+        padding: 12px 24px;
+        margin: 12px auto;
+        width: fit-content;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(12px);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #eee;
+        font-size: 18px;
+        pointer-events: auto;
+      }
+      #turnDot {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        transition: background 0.3s;
+      }
+      #statusMsg {
+        color: #ffd700;
+        font-weight: 600;
+        min-width: 120px;
+        text-align: center;
+      }
+      .side-panel {
+        position: fixed;
+        top: 50%;
+        transform: translateY(-50%);
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(10px);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 12px 8px;
+        min-height: 60px;
+        min-width: 44px;
+        pointer-events: auto;
+        color: #eee;
+      }
+      #capturedWhite {
+        left: 12px;
+      }
+      #capturedBlack {
+        right: 12px;
+      }
+      .side-panel .label {
+        font-size: 11px;
+        color: #aaa;
+        text-align: center;
+        margin-bottom: 6px;
+      }
+      .side-panel .pieces {
+        font-size: 24px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+      }
+      #bottomBar {
+        position: fixed;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 12px;
+        pointer-events: auto;
+      }
+      #bottomBar button {
+        padding: 10px 24px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(10px);
+        color: #eee;
+        font-size: 15px;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      #bottomBar button:hover {
+        background: rgba(255, 255, 255, 0.15);
+      }
+      #promotionModal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        justify-content: center;
+        align-items: center;
+        z-index: 100;
+        pointer-events: auto;
+      }
+      #promotionModal.active {
+        display: flex;
+      }
+      #promotionDialog {
+        background: rgba(30, 30, 50, 0.95);
+        backdrop-filter: blur(16px);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        padding: 24px 32px;
+        text-align: center;
+      }
+      #promotionDialog h3 {
+        color: #eee;
+        margin-bottom: 16px;
+        font-size: 18px;
+      }
+      #promotionDialog .promo-buttons {
+        display: flex;
+        gap: 12px;
+      }
+      #promotionDialog button {
+        width: 64px;
+        height: 64px;
+        font-size: 36px;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.08);
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      #promotionDialog button:hover {
+        background: rgba(255, 255, 255, 0.2);
+        border-color: #ffd700;
+        transform: scale(1.1);
+      }
+      /* Lobby Modal */
+      #lobbyModal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(10, 10, 30, 0.85);
+        backdrop-filter: blur(16px);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 200;
+      }
+      #lobbyModal.hidden {
+        display: none;
+      }
+      #lobbyDialog {
+        background: rgba(30, 30, 60, 0.92);
+        backdrop-filter: blur(20px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        padding: 36px 40px;
+        text-align: center;
+        min-width: 340px;
+        box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+      }
+      #lobbyDialog h2 {
+        color: #eee;
+        margin-bottom: 28px;
+        font-size: 26px;
+        font-weight: 700;
+        letter-spacing: 1px;
+      }
+      .lobby-btn {
+        display: block;
+        width: 100%;
+        padding: 14px 0;
+        margin-bottom: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.07);
+        color: #eee;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: 500;
+      }
+      .lobby-btn:hover {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: #ffd700;
+      }
+      #lobbyRoomCode {
+        font-size: 48px;
+        font-weight: 800;
+        color: #ffd700;
+        letter-spacing: 12px;
+        margin: 16px 0 8px;
+      }
+      #lobbyInput {
+        width: 100%;
+        padding: 12px;
+        margin-bottom: 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(0, 0, 0, 0.3);
+        color: #eee;
+        font-size: 22px;
+        text-align: center;
+        letter-spacing: 8px;
+        outline: none;
+        font-weight: 600;
+      }
+      #lobbyInput::placeholder {
+        color: rgba(255, 255, 255, 0.3);
+        letter-spacing: 4px;
+        font-size: 16px;
+      }
+      #lobbyStatus {
+        color: #aaa;
+        margin-top: 12px;
+        font-size: 14px;
+        min-height: 20px;
+      }
+      #lobbyStatus.error,
+      #lobbyJoinStatus.error {
+        color: #ff6644;
+      }
+      #lobbyJoinStatus {
+        color: #aaa;
+        margin-top: 8px;
+        font-size: 14px;
+        min-height: 20px;
+      }
+      #lobbyBack {
+        margin-top: 8px;
+        background: none;
+        border: none;
+        color: #888;
+        cursor: pointer;
+        font-size: 14px;
+        text-decoration: underline;
+      }
+      #lobbyBack:hover {
+        color: #eee;
+      }
+      /* 2D Board Canvas */
+      #board2d {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+      }
+      /* View mode toggle in lobby */
+      .view-toggle {
+        display: flex;
+        justify-content: center;
+        gap: 0;
+        margin-bottom: 20px;
+      }
+      .view-toggle button {
+        padding: 8px 28px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.05);
+        color: #aaa;
+        transition: all 0.2s;
+      }
+      .view-toggle button:first-child {
+        border-radius: 8px 0 0 8px;
+      }
+      .view-toggle button:last-child {
+        border-radius: 0 8px 8px 0;
+      }
+      .view-toggle button.active {
+        background: rgba(255, 215, 0, 0.18);
+        color: #ffd700;
+        border-color: #ffd700;
+      }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <canvas id="board2d" style="display: none"></canvas>
+    <div id="lobbyModal">
+      <div id="lobbyDialog">
+        <h2>3D Chess</h2>
+        <div class="view-toggle" id="viewToggle">
+          <button id="btnView2D">2D</button>
+          <button id="btnView3D" class="active">3D</button>
+        </div>
+        <div id="lobbyMenu">
+          <button class="lobby-btn" id="btnLocal">Local Oyun</button>
+          <button class="lobby-btn" id="btnCreate">Oda Oluştur</button>
+          <button class="lobby-btn" id="btnJoinShow">Odaya Katıl</button>
+        </div>
+        <div id="lobbyWaiting" style="display: none">
+          <div style="color: #aaa; font-size: 14px">Oda Kodu</div>
+          <div id="lobbyRoomCode">----</div>
+          <div id="lobbyStatus">Rakip bekleniyor...</div>
+          <button id="lobbyBack">Geri</button>
+        </div>
+        <div id="lobbyJoin" style="display: none">
+          <input
+            id="lobbyInput"
+            type="text"
+            maxlength="4"
+            placeholder="Kod girin"
+            inputmode="numeric"
+          />
+          <button class="lobby-btn" id="btnJoin">Katıl</button>
+          <div id="lobbyJoinStatus"></div>
+          <button
+            id="lobbyBackJoin"
+            class="lobby-btn"
+            style="
+              background: none;
+              border: none;
+              color: #888;
+              font-size: 14px;
+              text-decoration: underline;
+              margin-top: 4px;
+            "
+          >
+            Geri
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="overlay">
+      <div id="topBar">
+        <div id="turnDot"></div>
+        <div id="turnText">White's Turn</div>
+        <div id="statusMsg"></div>
+      </div>
+      <div id="capturedWhite" class="side-panel">
+        <div class="label">Captured</div>
+        <div class="pieces" id="capWhitePieces"></div>
+      </div>
+      <div id="capturedBlack" class="side-panel">
+        <div class="label">Captured</div>
+        <div class="pieces" id="capBlackPieces"></div>
+      </div>
+      <div id="bottomBar">
+        <button id="btnUndo">Undo</button>
+        <button id="btnNewGame">New Game</button>
+      </div>
+    </div>
+    <div id="promotionModal">
+      <div id="promotionDialog">
+        <h3>Promote Pawn</h3>
+        <div class="promo-buttons" id="promoButtons"></div>
+      </div>
+    </div>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+      // ── Scene Setup ──
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.2;
+      document.body.prepend(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x1a1a2e);
+      scene.fog = new THREE.Fog(0x1a1a2e, 20, 40);
+
+      const camera = new THREE.PerspectiveCamera(
+        45,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        100,
+      );
+      camera.position.set(0, 10, -10);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.08;
+      controls.minDistance = 6;
+      controls.maxDistance = 22;
+      controls.maxPolarAngle = Math.PI / 2.15;
+      controls.target.set(0, 0, 0);
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+      dirLight.position.set(5, 12, 8);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.set(2048, 2048);
+      dirLight.shadow.camera.left = -8;
+      dirLight.shadow.camera.right = 8;
+      dirLight.shadow.camera.top = 8;
+      dirLight.shadow.camera.bottom = -8;
+      dirLight.shadow.camera.near = 1;
+      dirLight.shadow.camera.far = 30;
+      dirLight.shadow.bias = -0.002;
+      scene.add(dirLight);
+
+      const fillLight = new THREE.DirectionalLight(0x8888ff, 0.3);
+      fillLight.position.set(-5, 6, -8);
+      scene.add(fillLight);
+
+      // ── Board ──
+      const squareMeshes = [];
+      const squareGroup = new THREE.Group();
+      scene.add(squareGroup);
+
+      const lightSquareColor = new THREE.Color(0xf0d9b5);
+      const darkSquareColor = new THREE.Color(0xb58863);
+      const squareGeo = new THREE.BoxGeometry(1, 0.2, 1);
+
+      for (let col = 0; col < 8; col++) {
+        squareMeshes[col] = [];
+        for (let row = 0; row < 8; row++) {
+          const isDark = (col + row) % 2 === 1;
+          const mat = new THREE.MeshStandardMaterial({
+            color: isDark ? darkSquareColor : lightSquareColor,
+            roughness: 0.8,
+            metalness: 0.1,
+          });
+          const sq = new THREE.Mesh(squareGeo, mat);
+          sq.position.set(col - 3.5, 0, row - 3.5);
+          sq.receiveShadow = true;
+          sq.userData = {
+            type: "square",
+            col,
+            row,
+            originalColor: mat.color.clone(),
+          };
+          squareGroup.add(sq);
+          squareMeshes[col][row] = sq;
+        }
+      }
+
+      // Frame
+      const frameMat = new THREE.MeshStandardMaterial({
+        color: 0x3e2723,
+        roughness: 0.6,
+        metalness: 0.2,
+      });
+      const frameThickness = 0.5;
+      const boardSize = 8;
+      const frameGeoSide = new THREE.BoxGeometry(
+        boardSize + frameThickness * 2,
+        0.22,
+        frameThickness,
+      );
+      const frameGeoEnd = new THREE.BoxGeometry(
+        frameThickness,
+        0.22,
+        boardSize,
+      );
+
+      const framePieces = [
+        { geo: frameGeoSide, pos: [0, -0.01, -4.25] },
+        { geo: frameGeoSide, pos: [0, -0.01, 4.25] },
+        { geo: frameGeoEnd, pos: [-4.25, -0.01, 0] },
+        { geo: frameGeoEnd, pos: [4.25, -0.01, 0] },
+      ];
+      framePieces.forEach(({ geo, pos }) => {
+        const m = new THREE.Mesh(geo, frameMat);
+        m.position.set(...pos);
+        m.receiveShadow = true;
+        scene.add(m);
+      });
+
+      // Board labels (file letters a-h and rank numbers 1-8)
+      function makeLabel(text) {
+        const c = document.createElement("canvas");
+        c.width = 64;
+        c.height = 64;
+        const ctx = c.getContext("2d");
+        ctx.fillStyle = "#ccbbaa";
+        ctx.font = "bold 42px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, 32, 32);
+        const tex = new THREE.CanvasTexture(c);
+        const spriteMat = new THREE.SpriteMaterial({
+          map: tex,
+          transparent: true,
+        });
+        const sprite = new THREE.Sprite(spriteMat);
+        sprite.scale.set(0.4, 0.4, 1);
+        return sprite;
+      }
+
+      const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
+      for (let i = 0; i < 8; i++) {
+        // File labels (a-h) along white side (near camera, z = -4.6)
+        const fl = makeLabel(files[7 - i]);
+        fl.position.set(i - 3.5, 0.05, -4.6);
+        scene.add(fl);
+        // File labels along black side (far from camera, z = +4.6)
+        const fl2 = makeLabel(files[7 - i]);
+        fl2.position.set(i - 3.5, 0.05, 4.6);
+        scene.add(fl2);
+        // Rank labels (1-8) along left side: row i maps to rank i+1
+        const rl = makeLabel(String(i + 1));
+        rl.position.set(-4.6, 0.05, i - 3.5);
+        scene.add(rl);
+        // Rank labels along right side
+        const rl2 = makeLabel(String(i + 1));
+        rl2.position.set(4.6, 0.05, i - 3.5);
+        scene.add(rl2);
+      }
+
+      // Ground plane
+      const groundGeo = new THREE.PlaneGeometry(40, 40);
+      const groundMat = new THREE.MeshStandardMaterial({
+        color: 0x111122,
+        roughness: 1,
+      });
+      const ground = new THREE.Mesh(groundGeo, groundMat);
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.y = -0.12;
+      ground.receiveShadow = true;
+      scene.add(ground);
+
+      // ── Piece Geometry Factories ──
+      const WHITE_COLOR = 0xf5f5f0;
+      const BLACK_COLOR = 0x2a2a2a;
+
+      function makePieceMaterial(color) {
+        return new THREE.MeshStandardMaterial({
+          color,
+          roughness: 0.35,
+          metalness: 0.15,
+        });
+      }
+
+      function createPawn(pieceColor) {
+        const group = new THREE.Group();
+        const mat = makePieceMaterial(pieceColor);
+        // Base
+        const base = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.3, 0.35, 0.15, 24),
+          mat.clone(),
+        );
+        base.position.y = 0.175;
+        base.castShadow = true;
+        group.add(base);
+        // Stem
+        const stem = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.12, 0.2, 0.4, 16),
+          mat.clone(),
+        );
+        stem.position.y = 0.45;
+        stem.castShadow = true;
+        group.add(stem);
+        // Head
+        const head = new THREE.Mesh(
+          new THREE.SphereGeometry(0.2, 16, 16),
+          mat.clone(),
+        );
+        head.position.y = 0.75;
+        head.castShadow = true;
+        group.add(head);
+        return group;
+      }
+
+      function createRook(pieceColor) {
+        const group = new THREE.Group();
+        const mat = makePieceMaterial(pieceColor);
+        const base = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.32, 0.37, 0.15, 24),
+          mat.clone(),
+        );
+        base.position.y = 0.175;
+        base.castShadow = true;
+        group.add(base);
+        const tower = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.22, 0.28, 0.55, 16),
+          mat.clone(),
+        );
+        tower.position.y = 0.525;
+        tower.castShadow = true;
+        group.add(tower);
+        const top = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.28, 0.22, 0.12, 16),
+          mat.clone(),
+        );
+        top.position.y = 0.86;
+        top.castShadow = true;
+        group.add(top);
+        // Crenellations
+        for (let i = 0; i < 4; i++) {
+          const cren = new THREE.Mesh(
+            new THREE.BoxGeometry(0.12, 0.14, 0.12),
+            mat.clone(),
+          );
+          const angle = (i / 4) * Math.PI * 2;
+          cren.position.set(Math.cos(angle) * 0.2, 0.99, Math.sin(angle) * 0.2);
+          cren.castShadow = true;
+          group.add(cren);
+        }
+        return group;
+      }
+
+      function createKnight(pieceColor) {
+        const group = new THREE.Group();
+        const mat = makePieceMaterial(pieceColor);
+        const base = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.3, 0.35, 0.15, 24),
+          mat.clone(),
+        );
+        base.position.y = 0.175;
+        base.castShadow = true;
+        group.add(base);
+        // Neck
+        const neck = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.13, 0.22, 0.5, 12),
+          mat.clone(),
+        );
+        neck.position.y = 0.5;
+        neck.rotation.z = 0.15;
+        neck.castShadow = true;
+        group.add(neck);
+        // Head
+        const head = new THREE.Mesh(
+          new THREE.BoxGeometry(0.2, 0.28, 0.32),
+          mat.clone(),
+        );
+        head.position.set(0.05, 0.82, 0.05);
+        head.castShadow = true;
+        group.add(head);
+        // Snout
+        const snout = new THREE.Mesh(
+          new THREE.BoxGeometry(0.14, 0.15, 0.25),
+          mat.clone(),
+        );
+        snout.position.set(0.05, 0.72, 0.2);
+        snout.castShadow = true;
+        group.add(snout);
+        // Ear
+        const ear = new THREE.Mesh(
+          new THREE.ConeGeometry(0.06, 0.16, 8),
+          mat.clone(),
+        );
+        ear.position.set(0.05, 1.02, 0);
+        ear.castShadow = true;
+        group.add(ear);
+        return group;
+      }
+
+      function createBishop(pieceColor) {
+        const group = new THREE.Group();
+        const mat = makePieceMaterial(pieceColor);
+        const base = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.3, 0.35, 0.15, 24),
+          mat.clone(),
+        );
+        base.position.y = 0.175;
+        base.castShadow = true;
+        group.add(base);
+        const body = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.1, 0.25, 0.6, 16),
+          mat.clone(),
+        );
+        body.position.y = 0.55;
+        body.castShadow = true;
+        group.add(body);
+        // Mitre
+        const mitre = new THREE.Mesh(
+          new THREE.SphereGeometry(0.18, 16, 16),
+          mat.clone(),
+        );
+        mitre.scale.set(1, 1.4, 1);
+        mitre.position.y = 0.95;
+        mitre.castShadow = true;
+        group.add(mitre);
+        // Tip
+        const tip = new THREE.Mesh(
+          new THREE.SphereGeometry(0.06, 10, 10),
+          mat.clone(),
+        );
+        tip.position.y = 1.18;
+        tip.castShadow = true;
+        group.add(tip);
+        return group;
+      }
+
+      function createQueen(pieceColor) {
+        const group = new THREE.Group();
+        const mat = makePieceMaterial(pieceColor);
+        const base = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.32, 0.37, 0.15, 24),
+          mat.clone(),
+        );
+        base.position.y = 0.175;
+        base.castShadow = true;
+        group.add(base);
+        const body = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.12, 0.28, 0.65, 16),
+          mat.clone(),
+        );
+        body.position.y = 0.575;
+        body.castShadow = true;
+        group.add(body);
+        // Crown rim
+        const rim = new THREE.Mesh(
+          new THREE.TorusGeometry(0.16, 0.04, 8, 24),
+          mat.clone(),
+        );
+        rim.position.y = 0.98;
+        rim.rotation.x = Math.PI / 2;
+        rim.castShadow = true;
+        group.add(rim);
+        // Crown points
+        for (let i = 0; i < 6; i++) {
+          const point = new THREE.Mesh(
+            new THREE.SphereGeometry(0.055, 10, 10),
+            mat.clone(),
+          );
+          const angle = (i / 6) * Math.PI * 2;
+          point.position.set(
+            Math.cos(angle) * 0.16,
+            1.08,
+            Math.sin(angle) * 0.16,
+          );
+          point.castShadow = true;
+          group.add(point);
+        }
+        return group;
+      }
+
+      function createKing(pieceColor) {
+        const group = new THREE.Group();
+        const mat = makePieceMaterial(pieceColor);
+        const base = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.32, 0.37, 0.15, 24),
+          mat.clone(),
+        );
+        base.position.y = 0.175;
+        base.castShadow = true;
+        group.add(base);
+        const body = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.13, 0.28, 0.7, 16),
+          mat.clone(),
+        );
+        body.position.y = 0.6;
+        body.castShadow = true;
+        group.add(body);
+        // Band
+        const band = new THREE.Mesh(
+          new THREE.TorusGeometry(0.17, 0.04, 8, 24),
+          mat.clone(),
+        );
+        band.position.y = 1.0;
+        band.rotation.x = Math.PI / 2;
+        band.castShadow = true;
+        group.add(band);
+        // Cross vertical
+        const crossV = new THREE.Mesh(
+          new THREE.BoxGeometry(0.06, 0.28, 0.06),
+          mat.clone(),
+        );
+        crossV.position.y = 1.2;
+        crossV.castShadow = true;
+        group.add(crossV);
+        // Cross horizontal
+        const crossH = new THREE.Mesh(
+          new THREE.BoxGeometry(0.2, 0.06, 0.06),
+          mat.clone(),
+        );
+        crossH.position.y = 1.26;
+        crossH.castShadow = true;
+        group.add(crossH);
+        return group;
+      }
+
+      const pieceFactories = {
+        pawn: createPawn,
+        rook: createRook,
+        knight: createKnight,
+        bishop: createBishop,
+        queen: createQueen,
+        king: createKing,
+      };
+
+      // ── Game State ──
+      let board = []; // board[col][row]
+      let pieceMeshes = []; // pieceMeshes[col][row]
+      let turn = "white";
+      let selectedSquare = null;
+      let legalMovesForSelected = [];
+      let castlingRights = {
+        white: { kingSide: true, queenSide: true },
+        black: { kingSide: true, queenSide: true },
+      };
+      let enPassantTarget = null; // {col, row}
+      let capturedWhite = [];
+      let capturedBlack = [];
+      let moveHistory = [];
+      let gameStatus = "playing";
+      let markers = [];
+      let animating = false;
+      let pendingPromotion = null;
+
+      // ── Multiplayer State ──
+      let gameMode = "local"; // 'local' | 'online'
+      let playerColor = null; // 'white' | 'black'
+      let socket = null; // Socket.IO instance
+      let roomCode = null;
+      let isRemoteMove = false; // prevent emit during remote move
+      let newGameRequested = false; // track new game request
+
+      let viewMode = "3d"; // '3d' | '2d'
+
+      const PIECE_UNICODE = {
+        white: {
+          king: "\u2654",
+          queen: "\u2655",
+          rook: "\u2656",
+          bishop: "\u2657",
+          knight: "\u2658",
+          pawn: "\u2659",
+        },
+        black: {
+          king: "\u265A",
+          queen: "\u265B",
+          rook: "\u265C",
+          bishop: "\u265D",
+          knight: "\u265E",
+          pawn: "\u265F",
+        },
+      };
+
+      // ── 2D Board Canvas & Rendering ──
+      const board2dCanvas = document.getElementById("board2d");
+      const ctx2d = board2dCanvas.getContext("2d");
+
+      function renderBoard2D() {
+        if (viewMode !== "2d") return;
+        const canvas = board2dCanvas;
+        const dpr = window.devicePixelRatio || 1;
+        const vw = window.innerWidth,
+          vh = window.innerHeight;
+        canvas.width = vw * dpr;
+        canvas.height = vh * dpr;
+        canvas.style.width = vw + "px";
+        canvas.style.height = vh + "px";
+        const ctx = ctx2d;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        // Board sizing: square, centered, with margin
+        const margin = 40;
+        const boardPixels = Math.min(vw, vh) - margin * 2;
+        const sqSize = boardPixels / 8;
+        const frameW = 28;
+        const totalSize = boardPixels + frameW * 2;
+        const ox = (vw - totalSize) / 2;
+        const oy = (vh - totalSize) / 2;
+        const bx = ox + frameW;
+        const by = oy + frameW;
+
+        // Flip for black player in online mode
+        const flipped = gameMode === "online" && playerColor === "black";
+
+        // Clear
+        ctx.fillStyle = "#1a1a2e";
+        ctx.fillRect(0, 0, vw, vh);
+
+        // Frame (wood)
+        ctx.fillStyle = "#3e2723";
+        ctx.beginPath();
+        ctx.roundRect(ox, oy, totalSize, totalSize, 10);
+        ctx.fill();
+
+        // Labels
+        ctx.font = `bold ${Math.max(12, frameW * 0.52)}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "#ccbbaa";
+        const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
+        for (let i = 0; i < 8; i++) {
+          const fi = flipped ? 7 - i : i;
+          // File labels (bottom & top)
+          ctx.fillText(
+            files[fi],
+            bx + i * sqSize + sqSize / 2,
+            oy + totalSize - frameW / 2,
+          );
+          ctx.fillText(
+            files[fi],
+            bx + i * sqSize + sqSize / 2,
+            oy + frameW / 2,
+          );
+          // Rank labels (left & right)
+          const ri = flipped ? i + 1 : 8 - i;
+          ctx.fillText(
+            String(ri),
+            ox + frameW / 2,
+            by + i * sqSize + sqSize / 2,
+          );
+          ctx.fillText(
+            String(ri),
+            ox + totalSize - frameW / 2,
+            by + i * sqSize + sqSize / 2,
+          );
+        }
+
+        // Draw squares
+        for (let drawCol = 0; drawCol < 8; drawCol++) {
+          for (let drawRow = 0; drawRow < 8; drawRow++) {
+            const boardCol = flipped ? drawCol : 7 - drawCol;
+            const boardRow = flipped ? drawRow : 7 - drawRow;
+            const isDark = (boardCol + boardRow) % 2 === 1;
+            const sx = bx + drawCol * sqSize;
+            const sy = by + drawRow * sqSize;
+
+            // Base square color
+            ctx.fillStyle = isDark ? "#b58863" : "#f0d9b5";
+            ctx.fillRect(sx, sy, sqSize, sqSize);
+
+            // Selected square highlight
+            if (
+              selectedSquare &&
+              selectedSquare.col === boardCol &&
+              selectedSquare.row === boardRow
+            ) {
+              ctx.fillStyle = "rgba(102, 187, 102, 0.55)";
+              ctx.fillRect(sx, sy, sqSize, sqSize);
+            }
+
+            // Check highlight
+            if (
+              (gameStatus === "check" || gameStatus === "checkmate") &&
+              board[boardCol] &&
+              board[boardCol][boardRow] &&
+              board[boardCol][boardRow].type === "king" &&
+              board[boardCol][boardRow].color === turn
+            ) {
+              ctx.fillStyle = "rgba(221, 34, 34, 0.45)";
+              ctx.fillRect(sx, sy, sqSize, sqSize);
+            }
+
+            // Legal move markers
+            const isLegal = legalMovesForSelected.find(
+              (m) => m.col === boardCol && m.row === boardRow,
+            );
+            if (isLegal) {
+              const cx = sx + sqSize / 2;
+              const cy = sy + sqSize / 2;
+              if (isLegal.capture) {
+                // Red ring for captures
+                ctx.strokeStyle = "rgba(221, 51, 51, 0.7)";
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(cx, cy, sqSize * 0.38, 0, Math.PI * 2);
+                ctx.stroke();
+              } else {
+                // Green dot for moves
+                ctx.fillStyle = "rgba(68, 187, 68, 0.55)";
+                ctx.beginPath();
+                ctx.arc(cx, cy, sqSize * 0.16, 0, Math.PI * 2);
+                ctx.fill();
+              }
+            }
+
+            // Draw piece
+            const piece = board[boardCol] && board[boardCol][boardRow];
+            if (piece) {
+              const unicode = PIECE_UNICODE[piece.color][piece.type];
+              ctx.font = `${sqSize * 0.78}px serif`;
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              // Shadow for readability
+              ctx.fillStyle =
+                piece.color === "white"
+                  ? "rgba(0,0,0,0.25)"
+                  : "rgba(0,0,0,0.35)";
+              ctx.fillText(
+                unicode,
+                sx + sqSize / 2 + 1.5,
+                sy + sqSize / 2 + 2.5,
+              );
+              ctx.fillStyle = piece.color === "white" ? "#f5f5f0" : "#1a1a1a";
+              ctx.fillText(unicode, sx + sqSize / 2, sy + sqSize / 2 + 1);
+            }
+          }
+        }
+      }
+
+      // ── 2D Interaction ──
+      let pointer2dDown = null;
+
+      board2dCanvas.addEventListener("pointerdown", (e) => {
+        if (viewMode !== "2d") return;
+        pointer2dDown = { x: e.clientX, y: e.clientY };
+      });
+
+      board2dCanvas.addEventListener("pointerup", (e) => {
+        if (viewMode !== "2d") return;
+        if (!pointer2dDown) return;
+        const dx = e.clientX - pointer2dDown.x;
+        const dy = e.clientY - pointer2dDown.y;
+        pointer2dDown = null;
+        if (Math.sqrt(dx * dx + dy * dy) > 5) return;
+        if (animating || pendingPromotion) return;
+        if (gameStatus === "checkmate" || gameStatus === "stalemate") return;
+
+        // Compute board coords from click
+        const vw = window.innerWidth,
+          vh = window.innerHeight;
+        const margin = 40;
+        const boardPixels = Math.min(vw, vh) - margin * 2;
+        const sqSize = boardPixels / 8;
+        const frameW = 28;
+        const totalSize = boardPixels + frameW * 2;
+        const ox = (vw - totalSize) / 2;
+        const oy = (vh - totalSize) / 2;
+        const bx = ox + frameW;
+        const by = oy + frameW;
+
+        const flipped = gameMode === "online" && playerColor === "black";
+
+        const mx = e.clientX - bx;
+        const my = e.clientY - by;
+        if (mx < 0 || my < 0 || mx >= sqSize * 8 || my >= sqSize * 8) {
+          clearSelection();
+          renderBoard2D();
+          return;
+        }
+
+        let drawCol = Math.floor(mx / sqSize);
+        let drawRow = Math.floor(my / sqSize);
+        const clickCol = flipped ? drawCol : 7 - drawCol;
+        const clickRow = flipped ? drawRow : 7 - drawRow;
+
+        if (clickCol < 0 || clickCol > 7 || clickRow < 0 || clickRow > 7)
+          return;
+
+        const canInteract = gameMode === "local" || playerColor === turn;
+
+        if (!selectedSquare) {
+          const piece = board[clickCol][clickRow];
+          if (piece && piece.color === turn && canInteract) {
+            selectPiece(clickCol, clickRow);
+          }
+          return;
+        }
+
+        const move = legalMovesForSelected.find(
+          (m) => m.col === clickCol && m.row === clickRow,
+        );
+        if (move && canInteract) {
+          const fromCol = selectedSquare.col,
+            fromRow = selectedSquare.row;
+          clearSelection();
+          executeMove(fromCol, fromRow, clickCol, clickRow, move);
+        } else {
+          const piece = board[clickCol][clickRow];
+          clearSelection();
+          if (piece && piece.color === turn && canInteract) {
+            selectPiece(clickCol, clickRow);
+          }
+        }
+      });
+
+      function initBoard() {
+        board = Array.from({ length: 8 }, () => Array(8).fill(null));
+        pieceMeshes = Array.from({ length: 8 }, () => Array(8).fill(null));
+        const backRow = [
+          "rook",
+          "knight",
+          "bishop",
+          "king",
+          "queen",
+          "bishop",
+          "knight",
+          "rook",
+        ];
+        for (let c = 0; c < 8; c++) {
+          board[c][0] = { type: backRow[c], color: "white" };
+          board[c][1] = { type: "pawn", color: "white" };
+          board[c][6] = { type: "pawn", color: "black" };
+          board[c][7] = { type: backRow[c], color: "black" };
+        }
+      }
+
+      function placePieceMesh(col, row) {
+        const piece = board[col][row];
+        if (!piece) return;
+        if (viewMode === "2d") {
+          renderBoard2D();
+          return;
+        }
+        const color = piece.color === "white" ? WHITE_COLOR : BLACK_COLOR;
+        const mesh = pieceFactories[piece.type](color);
+        mesh.position.set(col - 3.5, 0.1, row - 3.5);
+        mesh.userData = {
+          type: "piece",
+          col,
+          row,
+          pieceColor: piece.color,
+          pieceType: piece.type,
+        };
+        mesh.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+        scene.add(mesh);
+        pieceMeshes[col][row] = mesh;
+      }
+
+      function placeAllPieces() {
+        if (viewMode === "2d") {
+          renderBoard2D();
+          return;
+        }
+        for (let c = 0; c < 8; c++) {
+          for (let r = 0; r < 8; r++) {
+            if (board[c][r]) placePieceMesh(c, r);
+          }
+        }
+      }
+
+      function clearAllPieces() {
+        for (let c = 0; c < 8; c++) {
+          for (let r = 0; r < 8; r++) {
+            if (pieceMeshes[c][r]) {
+              scene.remove(pieceMeshes[c][r]);
+              pieceMeshes[c][r] = null;
+            }
+          }
+        }
+        if (viewMode === "2d") renderBoard2D();
+      }
+
+      // ── Move Generation ──
+      function inBounds(c, r) {
+        return c >= 0 && c < 8 && r >= 0 && r < 8;
+      }
+
+      function slidingMoves(col, row, directions, color) {
+        const moves = [];
+        for (const [dc, dr] of directions) {
+          let c = col + dc,
+            r = row + dr;
+          while (inBounds(c, r)) {
+            if (!board[c][r]) {
+              moves.push({ col: c, row: r });
+            } else {
+              if (board[c][r].color !== color)
+                moves.push({ col: c, row: r, capture: true });
+              break;
+            }
+            c += dc;
+            r += dr;
+          }
+        }
+        return moves;
+      }
+
+      function getPseudoLegalMoves(col, row) {
+        const piece = board[col][row];
+        if (!piece) return [];
+        const { type, color } = piece;
+        const moves = [];
+        const dir = color === "white" ? 1 : -1;
+        const startRow = color === "white" ? 1 : 6;
+
+        if (type === "pawn") {
+          // Forward
+          if (inBounds(col, row + dir) && !board[col][row + dir]) {
+            moves.push({ col, row: row + dir });
+            if (row === startRow && !board[col][row + 2 * dir]) {
+              moves.push({ col, row: row + 2 * dir });
+            }
+          }
+          // Captures
+          for (const dc of [-1, 1]) {
+            const nc = col + dc,
+              nr = row + dir;
+            if (inBounds(nc, nr)) {
+              if (board[nc][nr] && board[nc][nr].color !== color) {
+                moves.push({ col: nc, row: nr, capture: true });
+              }
+              // En passant
+              if (
+                enPassantTarget &&
+                enPassantTarget.col === nc &&
+                enPassantTarget.row === nr
+              ) {
+                moves.push({
+                  col: nc,
+                  row: nr,
+                  enPassant: true,
+                  capture: true,
+                });
+              }
+            }
+          }
+        } else if (type === "rook") {
+          moves.push(
+            ...slidingMoves(
+              col,
+              row,
+              [
+                [1, 0],
+                [-1, 0],
+                [0, 1],
+                [0, -1],
+              ],
+              color,
+            ),
+          );
+        } else if (type === "bishop") {
+          moves.push(
+            ...slidingMoves(
+              col,
+              row,
+              [
+                [1, 1],
+                [-1, 1],
+                [1, -1],
+                [-1, -1],
+              ],
+              color,
+            ),
+          );
+        } else if (type === "queen") {
+          moves.push(
+            ...slidingMoves(
+              col,
+              row,
+              [
+                [1, 0],
+                [-1, 0],
+                [0, 1],
+                [0, -1],
+                [1, 1],
+                [-1, 1],
+                [1, -1],
+                [-1, -1],
+              ],
+              color,
+            ),
+          );
+        } else if (type === "knight") {
+          for (const [dc, dr] of [
+            [1, 2],
+            [2, 1],
+            [2, -1],
+            [1, -2],
+            [-1, -2],
+            [-2, -1],
+            [-2, 1],
+            [-1, 2],
+          ]) {
+            const nc = col + dc,
+              nr = row + dr;
+            if (inBounds(nc, nr)) {
+              if (!board[nc][nr] || board[nc][nr].color !== color) {
+                moves.push({ col: nc, row: nr, capture: !!board[nc][nr] });
+              }
+            }
+          }
+        } else if (type === "king") {
+          for (const [dc, dr] of [
+            [1, 0],
+            [-1, 0],
+            [0, 1],
+            [0, -1],
+            [1, 1],
+            [-1, 1],
+            [1, -1],
+            [-1, -1],
+          ]) {
+            const nc = col + dc,
+              nr = row + dr;
+            if (inBounds(nc, nr)) {
+              if (!board[nc][nr] || board[nc][nr].color !== color) {
+                moves.push({ col: nc, row: nr, capture: !!board[nc][nr] });
+              }
+            }
+          }
+          // Castling
+          const cr = castlingRights[color];
+          const baseRow = color === "white" ? 0 : 7;
+          if (row === baseRow && col === 3) {
+            // King side (toward col 7)
+            if (
+              cr.kingSide &&
+              !board[4][baseRow] &&
+              !board[5][baseRow] &&
+              !board[6][baseRow] &&
+              board[7][baseRow] &&
+              board[7][baseRow].type === "rook" &&
+              board[7][baseRow].color === color
+            ) {
+              moves.push({ col: 5, row: baseRow, castling: "kingSide" });
+            }
+            // Queen side (toward col 0)
+            if (
+              cr.queenSide &&
+              !board[2][baseRow] &&
+              !board[1][baseRow] &&
+              board[0][baseRow] &&
+              board[0][baseRow].type === "rook" &&
+              board[0][baseRow].color === color
+            ) {
+              moves.push({ col: 1, row: baseRow, castling: "queenSide" });
+            }
+          }
+        }
+        return moves;
+      }
+
+      // ── Attack Detection ──
+      function canPieceAttack(col, row, targetCol, targetRow) {
+        const piece = board[col][row];
+        if (!piece) return false;
+        const { type, color } = piece;
+        const dc = targetCol - col,
+          dr = targetRow - row;
+        const adc = Math.abs(dc),
+          adr = Math.abs(dr);
+
+        if (type === "pawn") {
+          const dir = color === "white" ? 1 : -1;
+          return adc === 1 && dr === dir;
+        }
+        if (type === "knight")
+          return (adc === 1 && adr === 2) || (adc === 2 && adr === 1);
+        if (type === "king") return adc <= 1 && adr <= 1 && adc + adr > 0;
+        // Sliding pieces
+        if (type === "rook" || type === "queen") {
+          if (dc === 0 || dr === 0) {
+            const sc = Math.sign(dc),
+              sr = Math.sign(dr);
+            let c = col + sc,
+              r = row + sr;
+            while (c !== targetCol || r !== targetRow) {
+              if (board[c][r]) return false;
+              c += sc;
+              r += sr;
+            }
+            return true;
+          }
+        }
+        if (type === "bishop" || type === "queen") {
+          if (adc === adr && adc > 0) {
+            const sc = Math.sign(dc),
+              sr = Math.sign(dr);
+            let c = col + sc,
+              r = row + sr;
+            while (c !== targetCol || r !== targetRow) {
+              if (board[c][r]) return false;
+              c += sc;
+              r += sr;
+            }
+            return true;
+          }
+        }
+        return false;
+      }
+
+      function isSquareAttackedBy(col, row, attackerColor) {
+        for (let c = 0; c < 8; c++) {
+          for (let r = 0; r < 8; r++) {
+            if (
+              board[c][r] &&
+              board[c][r].color === attackerColor &&
+              canPieceAttack(c, r, col, row)
+            )
+              return true;
+          }
+        }
+        return false;
+      }
+
+      function findKing(color) {
+        for (let c = 0; c < 8; c++) {
+          for (let r = 0; r < 8; r++) {
+            if (
+              board[c][r] &&
+              board[c][r].type === "king" &&
+              board[c][r].color === color
+            )
+              return { col: c, row: r };
+          }
+        }
+        return null;
+      }
+
+      function isKingInCheck(color) {
+        const king = findKing(color);
+        if (!king) return false;
+        const enemy = color === "white" ? "black" : "white";
+        return isSquareAttackedBy(king.col, king.row, enemy);
+      }
+
+      // ── Legal Move Filtering ──
+      function cloneBoard() {
+        return board.map((col) =>
+          col.map((cell) => (cell ? { ...cell } : null)),
+        );
+      }
+
+      function getLegalMoves(col, row) {
+        const piece = board[col][row];
+        if (!piece) return [];
+        const pseudo = getPseudoLegalMoves(col, row);
+        const legal = [];
+        const enemy = piece.color === "white" ? "black" : "white";
+
+        for (const move of pseudo) {
+          // Castling extra checks
+          if (move.castling) {
+            if (isKingInCheck(piece.color)) continue;
+            const baseRow = piece.color === "white" ? 0 : 7;
+            if (move.castling === "kingSide") {
+              if (isSquareAttackedBy(4, baseRow, enemy)) continue;
+              if (isSquareAttackedBy(5, baseRow, enemy)) continue;
+            } else {
+              if (isSquareAttackedBy(2, baseRow, enemy)) continue;
+              if (isSquareAttackedBy(1, baseRow, enemy)) continue;
+            }
+          }
+
+          // Simulate move
+          const savedBoard = cloneBoard();
+          const savedEP = enPassantTarget;
+          // Execute on board
+          board[move.col][move.row] = board[col][row];
+          board[col][row] = null;
+          if (move.enPassant) {
+            const capturedRow =
+              piece.color === "white" ? move.row - 1 : move.row + 1;
+            board[move.col][capturedRow] = null;
+          }
+          if (move.castling) {
+            const baseRow = piece.color === "white" ? 0 : 7;
+            if (move.castling === "kingSide") {
+              board[4][baseRow] = board[7][baseRow];
+              board[7][baseRow] = null;
+            } else {
+              board[2][baseRow] = board[0][baseRow];
+              board[0][baseRow] = null;
+            }
+          }
+
+          const inCheck = isKingInCheck(piece.color);
+          // Restore
+          board = savedBoard;
+          enPassantTarget = savedEP;
+          if (!inCheck) legal.push(move);
+        }
+        return legal;
+      }
+
+      // ── Game Status ──
+      function getGameStatus() {
+        // Check if current player has any legal move
+        let hasLegal = false;
+        for (let c = 0; c < 8 && !hasLegal; c++) {
+          for (let r = 0; r < 8 && !hasLegal; r++) {
+            if (board[c][r] && board[c][r].color === turn) {
+              if (getLegalMoves(c, r).length > 0) hasLegal = true;
+            }
+          }
+        }
+        const inCheck = isKingInCheck(turn);
+        if (!hasLegal) return inCheck ? "checkmate" : "stalemate";
+        if (inCheck) return "check";
+        return "playing";
+      }
+
+      // ── Visual Markers ──
+      function clearMarkers() {
+        markers.forEach((m) => scene.remove(m));
+        markers = [];
+        if (viewMode === "2d") renderBoard2D();
+      }
+
+      function clearSelection() {
+        if (selectedSquare) {
+          if (viewMode === "3d") {
+            const sq = squareMeshes[selectedSquare.col][selectedSquare.row];
+            sq.material.color.copy(sq.userData.originalColor);
+            sq.material.emissive.setHex(0x000000);
+            const pm = pieceMeshes[selectedSquare.col][selectedSquare.row];
+            if (pm)
+              pm.traverse((child) => {
+                if (child.isMesh) child.material.emissive.setHex(0x000000);
+              });
+          }
+        }
+        selectedSquare = null;
+        legalMovesForSelected = [];
+        clearMarkers();
+      }
+
+      function showMoveMarkers(moves) {
+        clearMarkers();
+        if (viewMode === "2d") {
+          renderBoard2D();
+          return;
+        }
+        for (const move of moves) {
+          const x = move.col - 3.5,
+            z = move.row - 3.5;
+          if (move.capture) {
+            const ring = new THREE.Mesh(
+              new THREE.TorusGeometry(0.35, 0.05, 8, 24),
+              new THREE.MeshStandardMaterial({
+                color: 0xdd3333,
+                emissive: 0xdd3333,
+                emissiveIntensity: 0.4,
+              }),
+            );
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.set(x, 0.15, z);
+            scene.add(ring);
+            markers.push(ring);
+          } else {
+            const dot = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.12, 0.12, 0.06, 16),
+              new THREE.MeshStandardMaterial({
+                color: 0x44bb44,
+                emissive: 0x44bb44,
+                emissiveIntensity: 0.4,
+              }),
+            );
+            dot.position.set(x, 0.15, z);
+            scene.add(dot);
+            markers.push(dot);
+          }
+        }
+      }
+
+      function highlightCheck() {
+        if (viewMode === "2d") {
+          renderBoard2D();
+          return;
+        }
+        // Clear previous check highlights
+        for (let c = 0; c < 8; c++) {
+          for (let r = 0; r < 8; r++) {
+            if (
+              pieceMeshes[c][r] &&
+              board[c][r] &&
+              board[c][r].type === "king"
+            ) {
+              pieceMeshes[c][r].traverse((child) => {
+                if (child.isMesh) child.material.emissive.setHex(0x000000);
+              });
+              squareMeshes[c][r].material.emissive.setHex(0x000000);
+            }
+          }
+        }
+        if (gameStatus === "check" || gameStatus === "checkmate") {
+          const king = findKing(turn);
+          if (king) {
+            const pm = pieceMeshes[king.col][king.row];
+            if (pm)
+              pm.traverse((child) => {
+                if (child.isMesh) child.material.emissive.setHex(0xdd2222);
+              });
+            squareMeshes[king.col][king.row].material.emissive.set(0xdd2222);
+            squareMeshes[king.col][king.row].material.emissiveIntensity = 0.5;
+          }
+        }
+      }
+
+      // ── Move Execution ──
+      function executeMove(fromCol, fromRow, toCol, toRow, move) {
+        const piece = board[fromCol][fromRow];
+        const captured = board[toCol][toRow];
+        const historyEntry = {
+          from: { col: fromCol, row: fromRow },
+          to: { col: toCol, row: toRow },
+          piece: { ...piece },
+          captured: captured ? { ...captured } : null,
+          castling: move.castling || null,
+          enPassant: move.enPassant || false,
+          prevCastlingRights: JSON.parse(JSON.stringify(castlingRights)),
+          prevEnPassant: enPassantTarget ? { ...enPassantTarget } : null,
+          promotionType: null,
+        };
+
+        // Handle capture
+        if (captured) {
+          if (captured.color === "white") capturedWhite.push(captured.type);
+          else capturedBlack.push(captured.type);
+          if (pieceMeshes[toCol][toRow]) {
+            scene.remove(pieceMeshes[toCol][toRow]);
+            pieceMeshes[toCol][toRow] = null;
+          }
+        }
+
+        // En passant capture
+        if (move.enPassant) {
+          const capturedRow = piece.color === "white" ? toRow - 1 : toRow + 1;
+          const epPiece = board[toCol][capturedRow];
+          if (epPiece) {
+            if (epPiece.color === "white") capturedWhite.push("pawn");
+            else capturedBlack.push("pawn");
+          }
+          board[toCol][capturedRow] = null;
+          if (pieceMeshes[toCol][capturedRow]) {
+            scene.remove(pieceMeshes[toCol][capturedRow]);
+            pieceMeshes[toCol][capturedRow] = null;
+          }
+          historyEntry.epCapturedRow = capturedRow;
+        }
+
+        // Update board
+        board[toCol][toRow] = piece;
+        board[fromCol][fromRow] = null;
+
+        // En passant target
+        enPassantTarget = null;
+        if (piece.type === "pawn" && Math.abs(toRow - fromRow) === 2) {
+          enPassantTarget = { col: fromCol, row: (fromRow + toRow) / 2 };
+        }
+
+        // Castling rights
+        if (piece.type === "king") {
+          castlingRights[piece.color].kingSide = false;
+          castlingRights[piece.color].queenSide = false;
+        }
+        if (piece.type === "rook") {
+          if (fromCol === 0 && fromRow === (piece.color === "white" ? 0 : 7))
+            castlingRights[piece.color].queenSide = false;
+          if (fromCol === 7 && fromRow === (piece.color === "white" ? 0 : 7))
+            castlingRights[piece.color].kingSide = false;
+        }
+        // Rook captured
+        if (captured && captured.type === "rook") {
+          if (toCol === 0 && toRow === 0)
+            castlingRights.white.queenSide = false;
+          if (toCol === 7 && toRow === 0) castlingRights.white.kingSide = false;
+          if (toCol === 0 && toRow === 7)
+            castlingRights.black.queenSide = false;
+          if (toCol === 7 && toRow === 7) castlingRights.black.kingSide = false;
+        }
+
+        // Handle castling rook
+        if (move.castling) {
+          const baseRow = piece.color === "white" ? 0 : 7;
+          if (move.castling === "kingSide") {
+            board[4][baseRow] = board[7][baseRow];
+            board[7][baseRow] = null;
+            if (pieceMeshes[7][baseRow]) {
+              animatePiece(
+                pieceMeshes[7][baseRow],
+                4 - 3.5,
+                baseRow - 3.5,
+                () => {},
+              );
+              pieceMeshes[4][baseRow] = pieceMeshes[7][baseRow];
+              pieceMeshes[7][baseRow] = null;
+              pieceMeshes[4][baseRow].userData.col = 4;
+              pieceMeshes[4][baseRow].userData.row = baseRow;
+            }
+          } else {
+            board[2][baseRow] = board[0][baseRow];
+            board[0][baseRow] = null;
+            if (pieceMeshes[0][baseRow]) {
+              animatePiece(
+                pieceMeshes[0][baseRow],
+                2 - 3.5,
+                baseRow - 3.5,
+                () => {},
+              );
+              pieceMeshes[2][baseRow] = pieceMeshes[0][baseRow];
+              pieceMeshes[0][baseRow] = null;
+              pieceMeshes[2][baseRow].userData.col = 2;
+              pieceMeshes[2][baseRow].userData.row = baseRow;
+            }
+          }
+        }
+
+        // Move mesh
+        const mesh = pieceMeshes[fromCol][fromRow];
+        pieceMeshes[fromCol][fromRow] = null;
+        pieceMeshes[toCol][toRow] = mesh;
+        if (mesh) {
+          mesh.userData.col = toCol;
+          mesh.userData.row = toRow;
+        }
+
+        const onMoveComplete = () => {
+          // Promotion check
+          const promoRow = piece.color === "white" ? 7 : 0;
+          if (piece.type === "pawn" && toRow === promoRow) {
+            pendingPromotion = {
+              col: toCol,
+              row: toRow,
+              color: piece.color,
+              historyEntry,
+            };
+            showPromotionDialog(piece.color);
+            return;
+          }
+
+          finalizeMove(historyEntry);
+        };
+
+        if (mesh) {
+          animatePiece(mesh, toCol - 3.5, toRow - 3.5, onMoveComplete);
+        } else {
+          renderBoard2D();
+          onMoveComplete();
+        }
+      }
+
+      function finalizeMove(historyEntry) {
+        moveHistory.push(historyEntry);
+
+        // Emit move to server in online mode (only for local moves)
+        if (!isRemoteMove && gameMode === "online" && socket) {
+          const data = {
+            fromCol: historyEntry.from.col,
+            fromRow: historyEntry.from.row,
+            toCol: historyEntry.to.col,
+            toRow: historyEntry.to.row,
+            move: {
+              castling: historyEntry.castling,
+              enPassant: historyEntry.enPassant,
+            },
+          };
+          if (historyEntry.promotionType) {
+            data.promoteTo = historyEntry.promotionType;
+            socket.emit("promotion", data);
+          } else {
+            socket.emit("move", data);
+          }
+        }
+
+        const wasRemote = isRemoteMove;
+        if (isRemoteMove) isRemoteMove = false;
+
+        turn = turn === "white" ? "black" : "white";
+        gameStatus = getGameStatus();
+        updateUI();
+        highlightCheck();
+      }
+
+      function completePromotion(promoteTo) {
+        const { col, row, color, historyEntry } = pendingPromotion;
+        board[col][row] = { type: promoteTo, color };
+        historyEntry.promotionType = promoteTo;
+        // Replace mesh
+        if (pieceMeshes[col][row]) {
+          scene.remove(pieceMeshes[col][row]);
+        }
+        pieceMeshes[col][row] = null;
+        placePieceMesh(col, row);
+        pendingPromotion = null;
+        document.getElementById("promotionModal").classList.remove("active");
+        finalizeMove(historyEntry);
+      }
+
+      function showPromotionDialog(color) {
+        // In online mode, only the moving player picks promotion
+        if (isRemoteMove) return;
+        const modal = document.getElementById("promotionModal");
+        const btns = document.getElementById("promoButtons");
+        btns.innerHTML = "";
+        for (const t of ["queen", "rook", "bishop", "knight"]) {
+          const btn = document.createElement("button");
+          btn.textContent = PIECE_UNICODE[color][t];
+          btn.onclick = () => completePromotion(t);
+          btns.appendChild(btn);
+        }
+        modal.classList.add("active");
+      }
+
+      // ── Animation ──
+      function animatePiece(mesh, targetX, targetZ, onComplete) {
+        if (viewMode === "2d") {
+          renderBoard2D();
+          onComplete();
+          return;
+        }
+        animating = true;
+        const startX = mesh.position.x,
+          startZ = mesh.position.z,
+          startY = mesh.position.y;
+        const duration = 300;
+        const startTime = performance.now();
+        const dist = Math.sqrt(
+          (targetX - startX) ** 2 + (targetZ - startZ) ** 2,
+        );
+        const arcHeight = Math.min(dist * 0.3, 0.8);
+
+        function step(now) {
+          const t = Math.min((now - startTime) / duration, 1);
+          const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+          mesh.position.x = startX + (targetX - startX) * ease;
+          mesh.position.z = startZ + (targetZ - startZ) * ease;
+          mesh.position.y = startY + Math.sin(t * Math.PI) * arcHeight;
+          if (t < 1) {
+            requestAnimationFrame(step);
+          } else {
+            mesh.position.set(targetX, 0.1, targetZ);
+            animating = false;
+            onComplete();
+          }
+        }
+        requestAnimationFrame(step);
+      }
+
+      // ── Undo ──
+      function undoMove() {
+        if (moveHistory.length === 0 || animating || pendingPromotion) return;
+        const entry = moveHistory.pop();
+        const {
+          from,
+          to,
+          piece,
+          captured,
+          castling,
+          enPassant,
+          prevCastlingRights,
+          prevEnPassant,
+          promotionType,
+          epCapturedRow,
+        } = entry;
+
+        // If was a promotion, remove promoted mesh and recreate pawn
+        if (promotionType) {
+          if (pieceMeshes[to.col][to.row]) {
+            scene.remove(pieceMeshes[to.col][to.row]);
+          }
+          pieceMeshes[to.col][to.row] = null;
+        }
+
+        // Move piece back
+        board[from.col][from.row] = piece;
+        board[to.col][to.row] = captured;
+
+        if (promotionType) {
+          // Recreate pawn mesh
+          placePieceMesh(from.col, from.row);
+        } else {
+          const mesh = pieceMeshes[to.col][to.row];
+          pieceMeshes[to.col][to.row] = null;
+          pieceMeshes[from.col][from.row] = mesh;
+          if (mesh) {
+            mesh.position.set(from.col - 3.5, 0.1, from.row - 3.5);
+            mesh.userData.col = from.col;
+            mesh.userData.row = from.row;
+          }
+        }
+
+        // Restore captured piece
+        if (captured) {
+          placePieceMesh(to.col, to.row);
+          if (captured.color === "white") capturedWhite.pop();
+          else capturedBlack.pop();
+        }
+
+        // EP captured pawn restore
+        if (enPassant && epCapturedRow !== undefined) {
+          const epColor = piece.color === "white" ? "black" : "white";
+          board[to.col][epCapturedRow] = { type: "pawn", color: epColor };
+          placePieceMesh(to.col, epCapturedRow);
+          if (epColor === "white") capturedWhite.pop();
+          else capturedBlack.pop();
+        }
+
+        // Castling undo
+        if (castling) {
+          const baseRow = piece.color === "white" ? 0 : 7;
+          if (castling === "kingSide") {
+            board[7][baseRow] = board[4][baseRow];
+            board[4][baseRow] = null;
+            const rookMesh = pieceMeshes[4][baseRow];
+            pieceMeshes[4][baseRow] = null;
+            pieceMeshes[7][baseRow] = rookMesh;
+            if (rookMesh) {
+              rookMesh.position.set(7 - 3.5, 0.1, baseRow - 3.5);
+              rookMesh.userData.col = 7;
+              rookMesh.userData.row = baseRow;
+            }
+          } else {
+            board[0][baseRow] = board[2][baseRow];
+            board[2][baseRow] = null;
+            const rookMesh = pieceMeshes[2][baseRow];
+            pieceMeshes[2][baseRow] = null;
+            pieceMeshes[0][baseRow] = rookMesh;
+            if (rookMesh) {
+              rookMesh.position.set(0 - 3.5, 0.1, baseRow - 3.5);
+              rookMesh.userData.col = 0;
+              rookMesh.userData.row = baseRow;
+            }
+          }
+        }
+
+        // Restore state
+        castlingRights = prevCastlingRights;
+        enPassantTarget = prevEnPassant;
+        turn = piece.color;
+        gameStatus = getGameStatus();
+        clearSelection();
+        updateUI();
+        highlightCheck();
+      }
+
+      // ── UI Update ──
+      function updateUI() {
+        document.getElementById("turnDot").style.background =
+          turn === "white" ? "#f5f5f0" : "#2a2a2a";
+        document.getElementById("turnText").textContent =
+          turn === "white" ? "White's Turn" : "Black's Turn";
+        const statusEl = document.getElementById("statusMsg");
+        if (gameStatus === "checkmate") {
+          const winner = turn === "white" ? "Black" : "White";
+          statusEl.textContent = `Checkmate! ${winner} wins!`;
+          statusEl.style.color = "#ff4444";
+        } else if (gameStatus === "stalemate") {
+          statusEl.textContent = "Stalemate! Draw.";
+          statusEl.style.color = "#ffaa00";
+        } else if (gameStatus === "check") {
+          statusEl.textContent = "Check!";
+          statusEl.style.color = "#ff6644";
+        } else {
+          statusEl.textContent = "";
+        }
+
+        // Captured pieces
+        const order = ["queen", "rook", "bishop", "knight", "pawn"];
+        const sortCaptures = (arr, color) => {
+          const sorted = [...arr];
+          sorted.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+          return sorted.map((t) => PIECE_UNICODE[color][t]).join("");
+        };
+        document.getElementById("capWhitePieces").textContent = sortCaptures(
+          capturedWhite,
+          "white",
+        );
+        document.getElementById("capBlackPieces").textContent = sortCaptures(
+          capturedBlack,
+          "black",
+        );
+        if (viewMode === "2d") renderBoard2D();
+      }
+
+      // ── Raycasting & Interaction ──
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+      let pointerDownPos = null;
+
+      function getPieceGroupFromChild(obj) {
+        let current = obj;
+        while (current) {
+          if (current.userData && current.userData.type === "piece")
+            return current;
+          current = current.parent;
+        }
+        return null;
+      }
+
+      function onPointerDown(e) {
+        if (viewMode === "2d") return;
+        pointerDownPos = { x: e.clientX, y: e.clientY };
+      }
+
+      function onPointerUp(e) {
+        if (viewMode === "2d") return;
+        if (!pointerDownPos) return;
+        const dx = e.clientX - pointerDownPos.x;
+        const dy = e.clientY - pointerDownPos.y;
+        if (Math.sqrt(dx * dx + dy * dy) > 5) return; // was a drag
+        if (animating || pendingPromotion) return;
+        if (gameStatus === "checkmate" || gameStatus === "stalemate") return;
+
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+
+        // Check pieces first
+        const allPieceMeshChildren = [];
+        for (let c = 0; c < 8; c++) {
+          for (let r = 0; r < 8; r++) {
+            if (pieceMeshes[c][r]) {
+              pieceMeshes[c][r].traverse((child) => {
+                if (child.isMesh) allPieceMeshChildren.push(child);
+              });
+            }
+          }
+        }
+
+        const pieceHits = raycaster.intersectObjects(allPieceMeshChildren);
+        const squareHits = raycaster.intersectObjects(squareGroup.children);
+
+        let clickedPieceGroup = null;
+        if (pieceHits.length > 0) {
+          clickedPieceGroup = getPieceGroupFromChild(pieceHits[0].object);
+        }
+
+        let clickedSquare = null;
+        if (squareHits.length > 0) {
+          clickedSquare = squareHits[0].object.userData;
+        }
+
+        // Determine col/row of click
+        let clickCol = null,
+          clickRow = null;
+        if (clickedPieceGroup) {
+          clickCol = clickedPieceGroup.userData.col;
+          clickRow = clickedPieceGroup.userData.row;
+        } else if (clickedSquare) {
+          clickCol = clickedSquare.col;
+          clickRow = clickedSquare.row;
+        } else {
+          clearSelection();
+          return;
+        }
+
+        // Online mode: only allow interaction when it's your turn and your color
+        const canInteract = gameMode === "local" || playerColor === turn;
+
+        // If no piece selected
+        if (!selectedSquare) {
+          const piece = board[clickCol][clickRow];
+          if (piece && piece.color === turn && canInteract) {
+            selectPiece(clickCol, clickRow);
+          }
+          return;
+        }
+
+        // Piece is selected - check if clicking a valid move
+        const move = legalMovesForSelected.find(
+          (m) => m.col === clickCol && m.row === clickRow,
+        );
+        if (move && canInteract) {
+          const fromCol = selectedSquare.col,
+            fromRow = selectedSquare.row;
+          clearSelection();
+          executeMove(fromCol, fromRow, clickCol, clickRow, move);
+        } else {
+          // Re-select own piece or deselect
+          const piece = board[clickCol][clickRow];
+          clearSelection();
+          if (piece && piece.color === turn && canInteract) {
+            selectPiece(clickCol, clickRow);
+          }
+        }
+      }
+
+      function selectPiece(col, row) {
+        selectedSquare = { col, row };
+        legalMovesForSelected = getLegalMoves(col, row);
+
+        if (viewMode === "2d") {
+          renderBoard2D();
+          return;
+        }
+
+        // Highlight square
+        squareMeshes[col][row].material.color.setHex(0x66bb66);
+
+        // Glow piece
+        const pm = pieceMeshes[col][row];
+        if (pm)
+          pm.traverse((child) => {
+            if (child.isMesh) {
+              child.material.emissive.setHex(0x22aa22);
+              child.material.emissiveIntensity = 0.3;
+            }
+          });
+
+        showMoveMarkers(legalMovesForSelected);
+      }
+
+      renderer.domElement.addEventListener("pointerdown", onPointerDown);
+      renderer.domElement.addEventListener("pointerup", onPointerUp);
+
+      // ── Reset Board (shared logic) ──
+      function resetBoard() {
+        clearSelection();
+        clearAllPieces();
+        clearMarkers();
+        for (let c = 0; c < 8; c++)
+          for (let r = 0; r < 8; r++) {
+            squareMeshes[c][r].material.color.copy(
+              squareMeshes[c][r].userData.originalColor,
+            );
+            squareMeshes[c][r].material.emissive.setHex(0x000000);
+          }
+        turn = "white";
+        castlingRights = {
+          white: { kingSide: true, queenSide: true },
+          black: { kingSide: true, queenSide: true },
+        };
+        enPassantTarget = null;
+        capturedWhite = [];
+        capturedBlack = [];
+        moveHistory = [];
+        gameStatus = "playing";
+        pendingPromotion = null;
+        newGameRequested = false;
+        document.getElementById("promotionModal").classList.remove("active");
+
+        // Toggle canvas visibility based on viewMode
+        if (viewMode === "2d") {
+          renderer.domElement.style.display = "none";
+          board2dCanvas.style.display = "block";
+        } else {
+          renderer.domElement.style.display = "block";
+          board2dCanvas.style.display = "none";
+        }
+
+        initBoard();
+        placeAllPieces();
+        updateUI();
+      }
+
+      // ── Buttons ──
+      document.getElementById("btnNewGame").addEventListener("click", () => {
+        if (gameMode === "online" && socket) {
+          if (!newGameRequested) {
+            newGameRequested = true;
+            socket.emit("new_game_request");
+            document.getElementById("statusMsg").textContent =
+              "Yeni oyun isteği gönderildi...";
+            document.getElementById("statusMsg").style.color = "#ffd700";
+          }
+        } else {
+          resetBoard();
+        }
+      });
+
+      document.getElementById("btnUndo").addEventListener("click", undoMove);
+
+      // ── Lobby Logic ──
+      const lobbyModal = document.getElementById("lobbyModal");
+      const lobbyMenu = document.getElementById("lobbyMenu");
+      const lobbyWaiting = document.getElementById("lobbyWaiting");
+      const lobbyJoin = document.getElementById("lobbyJoin");
+
+      function showLobbySection(section) {
+        lobbyMenu.style.display = section === "menu" ? "block" : "none";
+        lobbyWaiting.style.display = section === "waiting" ? "block" : "none";
+        lobbyJoin.style.display = section === "join" ? "block" : "none";
+      }
+
+      function openLobby() {
+        lobbyModal.classList.remove("hidden");
+        showLobbySection("menu");
+        document.getElementById("lobbyJoinStatus").textContent = "";
+        document.getElementById("lobbyJoinStatus").className = "";
+      }
+
+      function closeLobby() {
+        lobbyModal.classList.add("hidden");
+      }
+
+      // View Mode Toggle
+      document.getElementById("btnView2D").addEventListener("click", () => {
+        viewMode = "2d";
+        document.getElementById("btnView2D").classList.add("active");
+        document.getElementById("btnView3D").classList.remove("active");
+      });
+      document.getElementById("btnView3D").addEventListener("click", () => {
+        viewMode = "3d";
+        document.getElementById("btnView3D").classList.add("active");
+        document.getElementById("btnView2D").classList.remove("active");
+      });
+
+      // Local Game
+      document.getElementById("btnLocal").addEventListener("click", () => {
+        gameMode = "local";
+        playerColor = null;
+        if (socket) {
+          socket.disconnect();
+          socket = null;
+        }
+        document.getElementById("btnUndo").style.display = "";
+        closeLobby();
+        resetBoard();
+      });
+
+      // Create Room
+      document.getElementById("btnCreate").addEventListener("click", () => {
+        socket = io();
+        socket.emit("create_room");
+        setupSocketListeners();
+        showLobbySection("waiting");
+      });
+
+      // Show Join UI
+      document.getElementById("btnJoinShow").addEventListener("click", () => {
+        showLobbySection("join");
+        document.getElementById("lobbyInput").value = "";
+        document.getElementById("lobbyInput").focus();
+      });
+
+      // Join Room
+      document.getElementById("btnJoin").addEventListener("click", () => {
+        const code = document.getElementById("lobbyInput").value.trim();
+        if (code.length !== 4) {
+          document.getElementById("lobbyJoinStatus").textContent =
+            "4 haneli kod girin.";
+          document.getElementById("lobbyJoinStatus").className = "error";
+          return;
+        }
+        socket = io();
+        setupSocketListeners();
+        socket.emit("join_room", { code });
+        document.getElementById("lobbyJoinStatus").textContent =
+          "Bağlanılıyor...";
+        document.getElementById("lobbyJoinStatus").className = "";
+      });
+
+      // Enter key to join
+      document.getElementById("lobbyInput").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") document.getElementById("btnJoin").click();
+      });
+
+      // Back buttons
+      document.getElementById("lobbyBack").addEventListener("click", () => {
+        if (socket) {
+          socket.disconnect();
+          socket = null;
+        }
+        showLobbySection("menu");
+      });
+      document.getElementById("lobbyBackJoin").addEventListener("click", () => {
+        if (socket) {
+          socket.disconnect();
+          socket = null;
+        }
+        showLobbySection("menu");
+      });
+
+      // ── Socket.IO Event Listeners ──
+      function setupSocketListeners() {
+        socket.on("room_created", ({ code }) => {
+          roomCode = code;
+          document.getElementById("lobbyRoomCode").textContent = code;
+          document.getElementById("lobbyStatus").textContent =
+            "Rakip bekleniyor...";
+        });
+
+        socket.on("join_error", ({ message }) => {
+          document.getElementById("lobbyJoinStatus").textContent = message;
+          document.getElementById("lobbyJoinStatus").className = "error";
+          if (socket) {
+            socket.disconnect();
+            socket = null;
+          }
+        });
+
+        socket.on("game_start", ({ color, code }) => {
+          gameMode = "online";
+          playerColor = color;
+          roomCode = code;
+          closeLobby();
+          resetBoard();
+
+          // Hide undo in online mode
+          document.getElementById("btnUndo").style.display = "none";
+
+          // Set camera for black player
+          if (color === "black") {
+            camera.position.set(0, 10, 10);
+            controls.target.set(0, 0, 0);
+            controls.update();
+          } else {
+            camera.position.set(0, 10, -10);
+            controls.target.set(0, 0, 0);
+            controls.update();
+          }
+        });
+
+        socket.on("move", (data) => {
+          const { fromCol, fromRow, toCol, toRow, move } = data;
+          isRemoteMove = true;
+          executeMove(fromCol, fromRow, toCol, toRow, move || {});
+          // isRemoteMove reset happens after animation completes in finalizeMove
+        });
+
+        socket.on("promotion", (data) => {
+          const { fromCol, fromRow, toCol, toRow, move, promoteTo } = data;
+          isRemoteMove = true;
+          // Use the standard executeMove which handles all state properly,
+          // but since showPromotionDialog is skipped for remote moves,
+          // we need to handle promotion completion after animation.
+          const piece = board[fromCol][fromRow];
+          // Temporarily store promoteTo so we can complete after executeMove
+          executeMove(fromCol, fromRow, toCol, toRow, move || {});
+          // After executeMove, pendingPromotion is set (pawn reached promo row)
+          // Wait for animation to complete then auto-promote
+          const waitForPromotion = () => {
+            if (pendingPromotion) {
+              completePromotion(promoteTo);
+              isRemoteMove = false;
+            } else if (animating) {
+              requestAnimationFrame(waitForPromotion);
+            } else {
+              isRemoteMove = false;
+            }
+          };
+          requestAnimationFrame(waitForPromotion);
+        });
+
+        socket.on("new_game_request", () => {
+          // Opponent wants new game — auto-accept and reset
+          socket.emit("new_game_accept");
+          resetBoard();
+          // Keep camera for current player color
+          if (playerColor === "black") {
+            camera.position.set(0, 10, 10);
+          } else {
+            camera.position.set(0, 10, -10);
+          }
+          controls.target.set(0, 0, 0);
+          controls.update();
+          document.getElementById("statusMsg").textContent =
+            "Yeni oyun başladı!";
+          document.getElementById("statusMsg").style.color = "#44bb44";
+          setTimeout(() => {
+            if (gameStatus === "playing") {
+              document.getElementById("statusMsg").textContent = "";
+            }
+          }, 2000);
+        });
+
+        socket.on("new_game_accept", () => {
+          newGameRequested = false;
+          resetBoard();
+          if (playerColor === "black") {
+            camera.position.set(0, 10, 10);
+          } else {
+            camera.position.set(0, 10, -10);
+          }
+          controls.target.set(0, 0, 0);
+          controls.update();
+          document.getElementById("statusMsg").textContent =
+            "Yeni oyun başladı!";
+          document.getElementById("statusMsg").style.color = "#44bb44";
+          setTimeout(() => {
+            if (gameStatus === "playing") {
+              document.getElementById("statusMsg").textContent = "";
+            }
+          }, 2000);
+        });
+
+        socket.on("opponent_disconnected", () => {
+          document.getElementById("statusMsg").textContent = "Rakip ayrıldı!";
+          document.getElementById("statusMsg").style.color = "#ff6644";
+          gameMode = "local";
+          playerColor = null;
+          if (socket) {
+            socket.disconnect();
+            socket = null;
+          }
+          // Show lobby after a short delay
+          setTimeout(() => {
+            openLobby();
+            document.getElementById("statusMsg").textContent = "";
+          }, 2000);
+        });
+      }
+
+      // ── Resize ──
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        if (viewMode === "2d") renderBoard2D();
+      });
+
+      // ── Render Loop ──
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+
+      // ── Init ──
+      initBoard();
+      placeAllPieces();
+      updateUI();
+      animate();
+    </script>
+  </body>
+</html>
