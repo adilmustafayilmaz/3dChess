@@ -28,20 +28,24 @@
         z-index: 10;
       }
       #topBar {
+        position: fixed;
+        top: 6px;
+        left: 50%;
+        transform: translateX(-50%);
         display: flex;
         justify-content: center;
         align-items: center;
-        gap: 16px;
-        padding: 12px 24px;
-        margin: 12px auto;
+        gap: 12px;
+        padding: 8px 18px;
         width: fit-content;
         background: rgba(0, 0, 0, 0.6);
         backdrop-filter: blur(12px);
-        border-radius: 12px;
+        border-radius: 10px;
         border: 1px solid rgba(255, 255, 255, 0.1);
         color: #eee;
-        font-size: 18px;
+        font-size: 16px;
         pointer-events: auto;
+        z-index: 11;
       }
       #turnDot {
         width: 18px;
@@ -91,26 +95,53 @@
       }
       #bottomBar {
         position: fixed;
-        bottom: 16px;
+        bottom: 6px;
         left: 50%;
         transform: translateX(-50%);
         display: flex;
-        gap: 12px;
+        gap: 10px;
         pointer-events: auto;
+        z-index: 11;
       }
       #bottomBar button {
-        padding: 10px 24px;
+        padding: 8px 18px;
         border: 1px solid rgba(255, 255, 255, 0.2);
         border-radius: 8px;
         background: rgba(0, 0, 0, 0.6);
         backdrop-filter: blur(10px);
         color: #eee;
-        font-size: 15px;
+        font-size: 14px;
         cursor: pointer;
         transition: background 0.2s;
       }
       #bottomBar button:hover {
         background: rgba(255, 255, 255, 0.15);
+      }
+      @media (max-width: 600px) {
+        #topBar {
+          gap: 8px;
+          padding: 5px 14px;
+          font-size: 14px;
+          top: 4px;
+        }
+        #turnDot {
+          width: 13px;
+          height: 13px;
+        }
+        #statusMsg {
+          min-width: 60px;
+          font-size: 12px;
+        }
+        #bottomBar {
+          bottom: 4px;
+        }
+        #bottomBar button {
+          padding: 6px 14px;
+          font-size: 13px;
+        }
+        .side-panel {
+          display: none !important;
+        }
       }
       #promotionModal {
         display: none;
@@ -403,7 +434,7 @@
 
       const scene = new THREE.Scene();
       scene.background = new THREE.Color(0x1a1a2e);
-      scene.fog = new THREE.Fog(0x1a1a2e, 20, 40);
+      scene.fog = new THREE.Fog(0x1a1a2e, 25, 50);
 
       const camera = new THREE.PerspectiveCamera(
         45,
@@ -411,13 +442,29 @@
         0.1,
         100,
       );
-      camera.position.set(0, 10, -10);
+
+      function getResponsiveCamDistance() {
+        const aspect = window.innerWidth / window.innerHeight;
+        if (aspect < 0.7) return 14;
+        if (aspect < 1) return 12;
+        return 10;
+      }
+
+      function setCameraForColor(color) {
+        const d = getResponsiveCamDistance();
+        const z = color === "black" ? d : -d;
+        camera.position.set(0, d, z);
+        controls.target.set(0, 0, 0);
+        controls.update();
+      }
+
+      camera.position.set(0, getResponsiveCamDistance(), -getResponsiveCamDistance());
 
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
       controls.dampingFactor = 0.08;
       controls.minDistance = 6;
-      controls.maxDistance = 22;
+      controls.maxDistance = 25;
       controls.maxPolarAngle = Math.PI / 2.15;
       controls.target.set(0, 0, 0);
 
@@ -850,12 +897,12 @@
 
       const PIECE_UNICODE = {
         white: {
-          king: "\u2654",
-          queen: "\u2655",
-          rook: "\u2656",
-          bishop: "\u2657",
-          knight: "\u2658",
-          pawn: "\u2659",
+          king: "\u265A",
+          queen: "\u265B",
+          rook: "\u265C",
+          bishop: "\u265D",
+          knight: "\u265E",
+          pawn: "\u265F",
         },
         black: {
           king: "\u265A",
@@ -871,29 +918,38 @@
       const board2dCanvas = document.getElementById("board2d");
       const ctx2d = board2dCanvas.getContext("2d");
 
+      function getBoardGeometry() {
+        const vw = window.innerWidth,
+          vh = window.innerHeight;
+        const topBarEl = document.getElementById("topBar");
+        const bottomBarEl = document.getElementById("bottomBar");
+        const topBarH = topBarEl ? topBarEl.offsetHeight + 12 : 48;
+        const bottomBarH = bottomBarEl ? bottomBarEl.offsetHeight + 12 : 48;
+        const gap = 6;
+        const frameW = Math.max(14, Math.min(24, vw * 0.02));
+        const availH = vh - topBarH - bottomBarH - gap * 2;
+        const availW = vw - gap * 2;
+        const totalSize = Math.max(Math.min(availW, availH), 100);
+        const boardPixels = totalSize - frameW * 2;
+        const sqSize = boardPixels / 8;
+        const ox = (vw - totalSize) / 2;
+        const oy = topBarH + gap + Math.max(0, (availH - totalSize) / 2);
+        const bx = ox + frameW;
+        const by = oy + frameW;
+        return { vw, vh, boardPixels, sqSize, frameW, totalSize, ox, oy, bx, by };
+      }
+
       function renderBoard2D() {
         if (viewMode !== "2d") return;
         const canvas = board2dCanvas;
         const dpr = window.devicePixelRatio || 1;
-        const vw = window.innerWidth,
-          vh = window.innerHeight;
+        const { vw, vh, boardPixels, sqSize, frameW, totalSize, ox, oy, bx, by } = getBoardGeometry();
         canvas.width = vw * dpr;
         canvas.height = vh * dpr;
         canvas.style.width = vw + "px";
         canvas.style.height = vh + "px";
         const ctx = ctx2d;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-        // Board sizing: square, centered, with margin
-        const margin = 40;
-        const boardPixels = Math.min(vw, vh) - margin * 2;
-        const sqSize = boardPixels / 8;
-        const frameW = 28;
-        const totalSize = boardPixels + frameW * 2;
-        const ox = (vw - totalSize) / 2;
-        const oy = (vh - totalSize) / 2;
-        const bx = ox + frameW;
-        const by = oy + frameW;
 
         // Flip for black player in online mode
         const flipped = gameMode === "online" && playerColor === "black";
@@ -1042,17 +1098,7 @@
         if (gameStatus === "checkmate" || gameStatus === "stalemate") return;
 
         // Compute board coords from click
-        const vw = window.innerWidth,
-          vh = window.innerHeight;
-        const margin = 40;
-        const boardPixels = Math.min(vw, vh) - margin * 2;
-        const sqSize = boardPixels / 8;
-        const frameW = 28;
-        const totalSize = boardPixels + frameW * 2;
-        const ox = (vw - totalSize) / 2;
-        const oy = (vh - totalSize) / 2;
-        const bx = ox + frameW;
-        const by = oy + frameW;
+        const { sqSize, bx, by } = getBoardGeometry();
 
         const flipped = gameMode === "online" && playerColor === "black";
 
@@ -2301,16 +2347,8 @@
           // Hide undo in online mode
           document.getElementById("btnUndo").style.display = "none";
 
-          // Set camera for black player
-          if (color === "black") {
-            camera.position.set(0, 10, 10);
-            controls.target.set(0, 0, 0);
-            controls.update();
-          } else {
-            camera.position.set(0, 10, -10);
-            controls.target.set(0, 0, 0);
-            controls.update();
-          }
+          // Set camera for player color
+          setCameraForColor(color);
         });
 
         socket.on("move", (data) => {
@@ -2348,14 +2386,7 @@
           // Opponent wants new game — auto-accept and reset
           socket.emit("new_game_accept");
           resetBoard();
-          // Keep camera for current player color
-          if (playerColor === "black") {
-            camera.position.set(0, 10, 10);
-          } else {
-            camera.position.set(0, 10, -10);
-          }
-          controls.target.set(0, 0, 0);
-          controls.update();
+          setCameraForColor(playerColor);
           document.getElementById("statusMsg").textContent =
             "Yeni oyun başladı!";
           document.getElementById("statusMsg").style.color = "#44bb44";
@@ -2369,13 +2400,7 @@
         socket.on("new_game_accept", () => {
           newGameRequested = false;
           resetBoard();
-          if (playerColor === "black") {
-            camera.position.set(0, 10, 10);
-          } else {
-            camera.position.set(0, 10, -10);
-          }
-          controls.target.set(0, 0, 0);
-          controls.update();
+          setCameraForColor(playerColor);
           document.getElementById("statusMsg").textContent =
             "Yeni oyun başladı!";
           document.getElementById("statusMsg").style.color = "#44bb44";
@@ -2409,6 +2434,14 @@
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
         if (viewMode === "2d") renderBoard2D();
+      });
+      window.addEventListener("orientationchange", () => {
+        setTimeout(() => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+          if (viewMode === "2d") renderBoard2D();
+        }, 200);
       });
 
       // ── Render Loop ──
