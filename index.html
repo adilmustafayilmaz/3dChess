@@ -914,6 +914,35 @@
         },
       };
 
+      // ── Piece SVG Image Cache (Lichess cburnett set) ──
+      const PIECE_SVG_BASE = "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/cburnett/";
+      const PIECE_SVG_KEYS = {
+        white: { king: "wK", queen: "wQ", rook: "wR", bishop: "wB", knight: "wN", pawn: "wP" },
+        black: { king: "bK", queen: "bQ", rook: "bR", bishop: "bB", knight: "bN", pawn: "bP" },
+      };
+      const pieceImages = { white: {}, black: {} };
+      let pieceImagesLoaded = false;
+
+      (function preloadPieceImages() {
+        let loaded = 0;
+        const total = 12;
+        for (const color of ["white", "black"]) {
+          for (const type of ["king", "queen", "rook", "bishop", "knight", "pawn"]) {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => {
+              loaded++;
+              if (loaded >= total) {
+                pieceImagesLoaded = true;
+                if (viewMode === "2d") renderBoard2D();
+              }
+            };
+            img.src = PIECE_SVG_BASE + PIECE_SVG_KEYS[color][type] + ".svg";
+            pieceImages[color][type] = img;
+          }
+        }
+      })();
+
       // ── 2D Board Canvas & Rendering ──
       const board2dCanvas = document.getElementById("board2d");
       const ctx2d = board2dCanvas.getContext("2d");
@@ -1058,22 +1087,19 @@
             // Draw piece
             const piece = board[boardCol] && board[boardCol][boardRow];
             if (piece) {
-              const unicode = PIECE_UNICODE[piece.color][piece.type];
-              ctx.font = `${sqSize * 0.78}px serif`;
-              ctx.textAlign = "center";
-              ctx.textBaseline = "middle";
-              // Shadow for readability
-              ctx.fillStyle =
-                piece.color === "white"
-                  ? "rgba(0,0,0,0.25)"
-                  : "rgba(0,0,0,0.35)";
-              ctx.fillText(
-                unicode,
-                sx + sqSize / 2 + 1.5,
-                sy + sqSize / 2 + 2.5,
-              );
-              ctx.fillStyle = piece.color === "white" ? "#f5f5f0" : "#1a1a1a";
-              ctx.fillText(unicode, sx + sqSize / 2, sy + sqSize / 2 + 1);
+              const img = pieceImages[piece.color][piece.type];
+              if (img && img.complete && img.naturalWidth > 0) {
+                const pad = sqSize * 0.05;
+                ctx.drawImage(img, sx + pad, sy + pad, sqSize - pad * 2, sqSize - pad * 2);
+              } else {
+                // Fallback to unicode while images load
+                const unicode = PIECE_UNICODE[piece.color][piece.type];
+                ctx.font = `${sqSize * 0.78}px serif`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillStyle = piece.color === "white" ? "#f5f5f0" : "#1a1a1a";
+                ctx.fillText(unicode, sx + sqSize / 2, sy + sqSize / 2 + 1);
+              }
             }
           }
         }
@@ -1852,7 +1878,17 @@
         btns.innerHTML = "";
         for (const t of ["queen", "rook", "bishop", "knight"]) {
           const btn = document.createElement("button");
-          btn.textContent = PIECE_UNICODE[color][t];
+          const img = pieceImages[color][t];
+          if (img && img.complete && img.naturalWidth > 0) {
+            const imgEl = document.createElement("img");
+            imgEl.src = img.src;
+            imgEl.width = 48;
+            imgEl.height = 48;
+            imgEl.style.display = "block";
+            btn.appendChild(imgEl);
+          } else {
+            btn.textContent = PIECE_UNICODE[color][t];
+          }
           btn.onclick = () => completePromotion(t);
           btns.appendChild(btn);
         }
@@ -2014,19 +2050,28 @@
 
         // Captured pieces
         const order = ["queen", "rook", "bishop", "knight", "pawn"];
-        const sortCaptures = (arr, color) => {
+        const renderCaptures = (arr, color, elId) => {
+          const el = document.getElementById(elId);
+          el.innerHTML = "";
           const sorted = [...arr];
           sorted.sort((a, b) => order.indexOf(a) - order.indexOf(b));
-          return sorted.map((t) => PIECE_UNICODE[color][t]).join("");
+          for (const t of sorted) {
+            const img = pieceImages[color][t];
+            if (img && img.complete && img.naturalWidth > 0) {
+              const imgEl = document.createElement("img");
+              imgEl.src = img.src;
+              imgEl.width = 24;
+              imgEl.height = 24;
+              el.appendChild(imgEl);
+            } else {
+              const span = document.createElement("span");
+              span.textContent = PIECE_UNICODE[color][t];
+              el.appendChild(span);
+            }
+          }
         };
-        document.getElementById("capWhitePieces").textContent = sortCaptures(
-          capturedWhite,
-          "white",
-        );
-        document.getElementById("capBlackPieces").textContent = sortCaptures(
-          capturedBlack,
-          "black",
-        );
+        renderCaptures(capturedWhite, "white", "capWhitePieces");
+        renderCaptures(capturedBlack, "black", "capBlackPieces");
         if (viewMode === "2d") renderBoard2D();
       }
 
