@@ -607,12 +607,12 @@
 
       // ── Piece Geometry Factories ──
       const WHITE_COLOR = 0xf5f5f0;
-      const BLACK_COLOR = 0x2a2a2a;
+      const BLACK_COLOR = 0x3a3a3a;
 
       function makePieceMaterial(color) {
         return new THREE.MeshStandardMaterial({
           color,
-          roughness: 0.35,
+          roughness: color === BLACK_COLOR ? 0.55 : 0.35,
           metalness: 0.15,
         });
       }
@@ -779,10 +779,10 @@
         base.castShadow = true;
         group.add(base);
         const body = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.12, 0.28, 0.65, 16),
+          new THREE.CylinderGeometry(0.12, 0.28, 0.85, 16),
           mat.clone(),
         );
-        body.position.y = 0.575;
+        body.position.y = 0.675;
         body.castShadow = true;
         group.add(body);
         // Crown rim
@@ -790,7 +790,7 @@
           new THREE.TorusGeometry(0.16, 0.04, 8, 24),
           mat.clone(),
         );
-        rim.position.y = 0.98;
+        rim.position.y = 1.18;
         rim.rotation.x = Math.PI / 2;
         rim.castShadow = true;
         group.add(rim);
@@ -803,7 +803,7 @@
           const angle = (i / 6) * Math.PI * 2;
           point.position.set(
             Math.cos(angle) * 0.16,
-            1.08,
+            1.28,
             Math.sin(angle) * 0.16,
           );
           point.castShadow = true;
@@ -823,10 +823,10 @@
         base.castShadow = true;
         group.add(base);
         const body = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.13, 0.28, 0.7, 16),
+          new THREE.CylinderGeometry(0.13, 0.28, 0.9, 16),
           mat.clone(),
         );
-        body.position.y = 0.6;
+        body.position.y = 0.7;
         body.castShadow = true;
         group.add(body);
         // Band
@@ -834,24 +834,24 @@
           new THREE.TorusGeometry(0.17, 0.04, 8, 24),
           mat.clone(),
         );
-        band.position.y = 1.0;
+        band.position.y = 1.2;
         band.rotation.x = Math.PI / 2;
         band.castShadow = true;
         group.add(band);
         // Cross vertical
         const crossV = new THREE.Mesh(
-          new THREE.BoxGeometry(0.06, 0.28, 0.06),
+          new THREE.BoxGeometry(0.06, 0.3, 0.06),
           mat.clone(),
         );
-        crossV.position.y = 1.2;
+        crossV.position.y = 1.42;
         crossV.castShadow = true;
         group.add(crossV);
         // Cross horizontal
         const crossH = new THREE.Mesh(
-          new THREE.BoxGeometry(0.2, 0.06, 0.06),
+          new THREE.BoxGeometry(0.22, 0.06, 0.06),
           mat.clone(),
         );
-        crossH.position.y = 1.26;
+        crossH.position.y = 1.48;
         crossH.castShadow = true;
         group.add(crossH);
         return group;
@@ -1175,7 +1175,7 @@
         }
         const color = piece.color === "white" ? WHITE_COLOR : BLACK_COLOR;
         const mesh = pieceFactories[piece.type](color);
-        mesh.position.set(col - 3.5, 0.1, row - 3.5);
+        mesh.position.set(col - 3.5, 0.05, row - 3.5);
         mesh.userData = {
           type: "piece",
           col,
@@ -1886,7 +1886,7 @@
           if (t < 1) {
             requestAnimationFrame(step);
           } else {
-            mesh.position.set(targetX, 0.1, targetZ);
+            mesh.position.set(targetX, 0.05, targetZ);
             animating = false;
             onComplete();
           }
@@ -1931,7 +1931,7 @@
           pieceMeshes[to.col][to.row] = null;
           pieceMeshes[from.col][from.row] = mesh;
           if (mesh) {
-            mesh.position.set(from.col - 3.5, 0.1, from.row - 3.5);
+            mesh.position.set(from.col - 3.5, 0.05, from.row - 3.5);
             mesh.userData.col = from.col;
             mesh.userData.row = from.row;
           }
@@ -1963,7 +1963,7 @@
             pieceMeshes[4][baseRow] = null;
             pieceMeshes[7][baseRow] = rookMesh;
             if (rookMesh) {
-              rookMesh.position.set(7 - 3.5, 0.1, baseRow - 3.5);
+              rookMesh.position.set(7 - 3.5, 0.05, baseRow - 3.5);
               rookMesh.userData.col = 7;
               rookMesh.userData.row = baseRow;
             }
@@ -1974,7 +1974,7 @@
             pieceMeshes[2][baseRow] = null;
             pieceMeshes[0][baseRow] = rookMesh;
             if (rookMesh) {
-              rookMesh.position.set(0 - 3.5, 0.1, baseRow - 3.5);
+              rookMesh.position.set(0 - 3.5, 0.05, baseRow - 3.5);
               rookMesh.userData.col = 0;
               rookMesh.userData.row = baseRow;
             }
