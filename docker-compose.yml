@@ -1,0 +1,15 @@
+services:
+  chess:
+    build: .
+    container_name: chess-server
+    restart: unless-stopped
+    ports:
+      - "3131:3131"
+    environment:
+      - NODE_ENV=production
+      - PORT=3131
+    mem_limit: 256m
+    cpus: 0.5
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
